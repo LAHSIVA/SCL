@@ -1,5 +1,8 @@
 #5) # 1. Milne’s predictor corrector method and Adam Bashforth method
-
+'''Given 2dy/dx = (1 + x^2)y^2 and y(0) = 1, y(0.1) = 1.06,
+y(0.2) = 1.12, y(0.3) = 1.21, evaluate y(0.4) by Milne’s
+predictor corrector method and Adam Bashforth method.
+'''
 import numpy as np
 import math
 
