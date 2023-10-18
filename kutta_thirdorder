@@ -1,5 +1,11 @@
 #5) #2. using runge kutta third order
 
+'''
+Using Runge-Kutta third method, solve dy/dx = xy + x^2, y(0) = 1;
+at x = 0.1, 0.2, 0.3. Continue the solution at x = 0.4 by Milne’s
+predictor corrector method and Adam Bashforth method.
+'''
+
 def runge_kutta_third_order(f, x0, y0, h, num_steps):
     x = x0
     y = y0
