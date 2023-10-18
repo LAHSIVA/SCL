@@ -1,0 +1,77 @@
+#6) Time velocity question
+#If data points are given.
+
+import numpy as np
+
+# Given data
+t = np.array([0, 5, 10, 15, 20, 25, 30, 35, 40])  # time in seconds
+V = np.array([30, 24, 19.5, 16, 13.6, 11.7, 10.0, 8.5, 7.0])  # velocity in m/s
+
+# Calculate the time step (h)
+h = t[1] - t[0]
+
+# Simpson's 1/3 Rule
+def simpsons_one_third_rule(V, h):
+    n = len(V)
+    integral = V[0] + V[-1]  # First and last terms
+
+    # Terms with even index
+    even_sum = 0
+    for i in range(2, n-1, 2):
+        even_sum += V[i]
+
+    # Terms with odd index
+    odd_sum = 0
+    for i in range(1, n-1, 2):
+        odd_sum += V[i]
+
+    integral += 2 * even_sum + 4 * odd_sum
+    integral *= h / 3
+
+    return integral
+
+# Simpson's 3/8 Rule
+def simpsons_three_eighth_rule(V, h):
+    n = len(V)
+    integral = V[0] + V[-1]  # First and last terms
+
+    # Terms with even index
+    even_sum = 0
+    for i in range(3, n-1, 3):
+        even_sum += V[i]
+
+    # Terms with a remainder of 1 when divided by 3
+    remainder_1_sum = 0
+    for i in range(1, n-1, 3):
+        remainder_1_sum += V[i]
+
+    # Terms with a remainder of 2 when divided by 3
+    remainder_2_sum = 0
+    for i in range(2, n-1, 3):
+        remainder_2_sum += V[i]
+
+    integral += 3 * even_sum + 2 * remainder_1_sum + 3 * remainder_2_sum
+    integral *= 3 * h / 8
+
+    return integral
+
+# Trapezoidal Rule
+def trapezoidal_rule(V, h):
+    n = len(V)
+    integral = V[0] + V[-1]  # First and last terms
+
+    for i in range(1, n-1):
+        integral += 2 * V[i]
+
+    integral *= h / 2
+
+    return integral
+
+# Calculate the distance moved by the train
+distance_simpsons_1_3 = simpsons_one_third_rule(V, h)
+distance_simpsons_3_8 = simpsons_three_eighth_rule(V, h)
+distance_trapezoidal = trapezoidal_rule(V, h)
+
+print("Distance moved by the train using Simpson's 1/3 Rule:", distance_simpsons_1_3, "meters")
+print("Distance moved by the train using Simpson's 3/8 Rule:", distance_simpsons_3_8, "meters")
+print("Distance moved by the train using Trapezoidal Rule:", distance_trapezoidal, "meters")
