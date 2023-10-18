@@ -1,4 +1,9 @@
 #5) #5 modified euler
+'''
+Using Modified Euler’s method, calculate y(4.1), y(4.2) and y(4.3)
+given that 5xy' + y^2 = 2, y(4) = 1; . Continue the solution at
+x = 4.4 by Milne’s predictor corrector method and Adam Bashforth method.
+'''
 
 def f(x, y):
     return (2 - y**2) / (5 * x)
