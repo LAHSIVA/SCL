@@ -1,0 +1,100 @@
+#1) Newton forward
+
+#forward
+import numpy as np
+import matplotlib.pyplot as plt
+from sympy import *
+import math
+
+n = int(input("Enter number of data points: "))
+x=[]
+y=[]
+
+for i in range(n):
+  x_v,y_v = map(float,input(f"Enter x value and y value of point {i+1}: ").split(" "))
+  x.append(x_v)
+  y.append(y_v)
+
+x=np.array(x)
+y=np.array(y)
+x_interp1 = float(input("Enter the first value of x for interpolation: "))
+x_interp2 = float(input("Enter the second value of x for interpolation: "))
+
+x_interp3 = float(input("Enter the value of x for first and second derivative: "))
+x_interp4 = float(input("Enter the another value of x for first and second derivative:"))
+
+X=symbols('X')
+xlist=[]
+temp=1
+for i in range(n):
+  temp*=(X-x[i])
+  xlist.append(temp)
+xlist.insert(0,1)
+
+
+table=np.zeros((n,n+1))
+table[:,0]=x
+table[:,1]=y
+
+
+
+for i in range(2,n+1):
+  for j in range(0,n-i+1):
+    table[j][i]=table[j+1][i-1]-table[j][i-1]
+for i in table:
+  print(i)
+h = x[1] - x[0]
+poly = 0
+p = (X - x[0]) / h
+
+temp = 1
+plist = []
+for i in range(n):
+    temp *= (p - i)
+    plist.append(temp)
+plist.insert(0, 1)
+
+# Compute the polynomial
+for i in range(n):
+    poly += table[0][i + 1] * plist[i] / math.factorial(i)
+
+# First derivative of the polynomial
+poly_prime = poly.diff(X)
+
+# Second derivative of the polynomial
+poly_double_prime = poly_prime.diff(X)
+
+# Evaluate the polynomial and its derivatives at x_interp1 and x_interp2
+poly_interp1 = poly.subs(X, x_interp1)
+poly_interp2 = poly.subs(X, x_interp2)
+prime_interp1 = poly_prime.subs(X, x_interp3)
+prime_interp2 = poly_prime.subs(X, x_interp4)
+double_prime_interp1 = poly_double_prime.subs(X, x_interp3)
+double_prime_interp2 = poly_double_prime.subs(X, x_interp4)
+
+print("polynomial",poly)
+print("first derivation of polynomial",poly_prime)
+print("second derivation of polynomial",poly_double_prime)
+# Print the results
+print("Polynomial Interpolation at x1:", poly_interp1)
+print("Polynomial Interpolation at x2:", poly_interp2)
+print("First Derivative at x3:", prime_interp1)
+print("First Derivative at x4:", prime_interp2)
+print("Second Derivative at x3:", double_prime_interp1)
+print("Second Derivative at x4:", double_prime_interp2)
+
+# Plot the polynomial and its derivatives
+x_values = np.linspace(min(x), max(x), 100)
+y_values = [poly.subs(X, val) for val in x_values]
+y_prime_values = [poly_prime.subs(X, val) for val in x_values]
+y_double_prime_values = [poly_double_prime.subs(X, val) for val in x_values]
+
+plt.figure()
+plt.plot(x_values, y_values, label="Polynomial")
+plt.plot(x_values, y_prime_values, label="First Derivative")
+plt.plot(x_values, y_double_prime_values, label="Second Derivative")
+plt.legend()
+plt.xlabel("x")
+plt.ylabel("y")
+plt.title("Polynomial and Its Derivatives")
+plt.show()
