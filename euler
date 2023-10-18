@@ -1,4 +1,9 @@
 #5) #4 euler
+'''
+Using Euler’s method, calculate y(0.1), y(0.2) and y(0.3) given
+that dy/dx = 2xy / 1+x^2 , y(0) = 0; . Continue the solution at x = 0.4 by
+Milne’s predictor corrector method and Adam Bashforth method.
+'''
 def f(x, y):
     return (2 - y**2) / (5 * x)
 
