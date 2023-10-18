@@ -1,0 +1,25 @@
+#2) Trapezoidal method
+
+import numpy as np
+
+# Define the function to be integrated
+def f(x):
+    return np.log(x)
+
+# Define the limits of integration
+a = 4
+b = 5.2
+
+# Number of subintervals
+n = 1000
+
+# Trapezoidal Rule
+def trapezoidal_rule(f, a, b, n):
+    h = (b - a) / n
+    integral = (f(a) + f(b)) / 2
+    for i in range(1, n):
+        integral += f(a + i * h)
+    integral *= h
+    return integral
+trapezoidal_integral = trapezoidal_rule(f, a, b, n)
+print("Trapezoidal Rule Integral:", trapezoidal_integral)
