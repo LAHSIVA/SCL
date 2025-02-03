@@ -1,0 +1,527 @@
+1) Dining
+
+
+#include <omp.h>        // Use OpenMP
+#include <stdio.h>      // Provide I/O
+#include <stdlib.h>     // Use NULL
+#include <unistd.h>     // Use usleep (sleep for a number of microseconds)
+#include <time.h>       // Include for nanosleep
+
+#define NUM_PHIL 5      // The number of philosophers
+#define MEALS 100       // The number of meals per philosopher
+
+static omp_lock_t chopsticks[NUM_PHIL];   // Locks to represent chopsticks
+
+/*  This function represents the philosopher threads. Each philosopher must
+ *  wait until all others have started before continuing. Each then eats NUM_PHIL
+ *  meals. Philosophers must acquire chopsticks to their left and right before eating.
+ */
+void philosopher()
+{
+    // Wait for all threads to start
+    #pragma omp barrier
+
+    // Set up variables for the thread id, right chopstick, and left chopstick.
+    int id = omp_get_thread_num();
+    int right_chopstick;
+    int left_chopstick;
+
+    // Philosophers 0 through NUM_PHIL-2 reach to the left first then the right.
+    if (id < NUM_PHIL - 1)
+    {
+        right_chopstick = id;
+        left_chopstick = id + 1;
+    }
+    // Philosopher NUM_PHIL-1 has its left and right swapped.  Notice that it reaches in the
+    // opposite order of all other philosophers.
+    else
+    {
+        right_chopstick = 0;
+        left_chopstick = id;
+    }
+
+    // Acquire chopsticks (semaphores), eat, wait for 100 microseconds, then release 
+    // chopsticks (semaphores).
+    int i;
+    for (i = 0; i < MEALS; i++)
+    {
+        printf("Philosopher %d is trying to pick up chopsticks %d and %d.\n", id, left_chopstick, right_chopstick);
+
+        // Acquire chopsticks
+        omp_set_lock(&chopsticks[left_chopstick]);
+        omp_set_lock(&chopsticks[right_chopstick]);
+
+        printf("Philosopher %d is eating.\n", id);
+
+        // Sleep for 100 microseconds using nanosleep
+        struct timespec req = {0};
+        req.tv_sec = 0;
+        req.tv_nsec = 100000;  // 100 microseconds
+        nanosleep(&req, NULL);
+
+        // Release chopsticks
+        omp_unset_lock(&chopsticks[left_chopstick]);
+        omp_unset_lock(&chopsticks[right_chopstick]);
+
+        printf("Philosopher %d has finished eating.\n", id);
+    }
+}
+
+// Main function.
+int main(int argc, char **argv)
+{
+    int i;
+
+    // Initialize locks
+    for (i = 0; i < NUM_PHIL; i++)
+        omp_init_lock(&chopsticks[i]);
+
+    // Record start time for overall execution time
+    double start_time = omp_get_wtime();
+
+    // Create and start philosopher threads.
+    #pragma omp parallel num_threads(NUM_PHIL)
+    {
+        philosopher();
+    }
+
+    // Record end time for overall execution time
+    double end_time = omp_get_wtime();
+
+    // Calculate total execution time
+    double total_time = end_time - start_time;
+
+    // Print the overall execution time
+    printf("\nOverall execution time: %f seconds\n", total_time);
+
+    // Wait for philosophers to finish then destroy locks.
+    for (i = 0; i < NUM_PHIL; i++)
+        omp_destroy_lock(&chopsticks[i]);
+
+    // End program.
+    return 0;
+}
+
+
+2) Producer
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+#define BUFFER_SIZE 5  // Max size of the buffer
+#define NUM_ITEMS 10   // Total items to produce/consume
+
+int buffer[BUFFER_SIZE]; // Shared buffer
+int count = 0;           // Number of items in buffer
+
+void producer() {
+    for (int i = 1; i <= NUM_ITEMS; i++) {
+        int produced_item = i; // Generate a new item
+
+        // **Wait if buffer is full**
+        while (count == BUFFER_SIZE);
+
+        #pragma omp critical
+        {
+            buffer[count] = produced_item;
+            count++;
+            printf("Produced: %d | Buffer Count: %d\n", produced_item, count);
+        }
+    }
+}
+
+void consumer() {
+    for (int i = 1; i <= NUM_ITEMS; i++) {
+        int consumed_item;
+
+        // **Wait if buffer is empty**
+        while (count == 0);
+
+        #pragma omp critical
+        {
+            consumed_item = buffer[count - 1];
+            count--;
+            printf("Consumed: %d | Buffer Count: %d\n", consumed_item, count);
+        }
+    }
+}
+
+int main() {
+    // **Run producer and consumer in parallel**
+    #pragma omp parallel sections
+    {
+        #pragma omp section
+        producer();
+
+        #pragma omp section
+        consumer();
+    }
+
+    return 0;
+}
+
+
+3) Reader Writer problem 
+
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>  // Include for nanosleep
+
+#define NUM_READERS 5       // Number of reader threads
+#define NUM_WRITERS 2       // Number of writer threads
+#define NUM_ITERATIONS 10   // Number of times each thread will read or write
+
+// Shared variables
+int data = 0;  // Shared data
+int readers_count = 0;  // Number of active readers
+
+// Locks for synchronizing access
+omp_lock_t data_lock;  // To protect shared resource
+omp_lock_t reader_lock;  // To synchronize readers
+
+// Function for sleeping (replacing usleep with nanosleep)
+void custom_sleep(int microseconds)
+{
+    struct timespec req = {0};
+    req.tv_sec = microseconds / 1000000;
+    req.tv_nsec = (microseconds % 1000000) * 1000;  // Convert microseconds to nanoseconds
+    nanosleep(&req, NULL);
+}
+
+// Reader function
+void reader(int id)
+{
+    int i;
+    for (i = 0; i < NUM_ITERATIONS; i++) {
+        // Request for reading access
+        omp_set_lock(&reader_lock);  // Lock to increment reader count
+        readers_count++;
+        if (readers_count == 1) {
+            omp_set_lock(&data_lock);  // First reader locks the data for reading
+        }
+        omp_unset_lock(&reader_lock);
+
+        // Read the data (Critical section)
+        printf("Reader %d is reading data: %d\n", id, data);
+        custom_sleep(100000);  // Simulate reading time (100 ms)
+
+        // Release reading access
+        omp_set_lock(&reader_lock);  // Lock to decrement reader count
+        readers_count--;
+        if (readers_count == 0) {
+            omp_unset_lock(&data_lock);  // Last reader releases the data lock
+        }
+        omp_unset_lock(&reader_lock);
+
+        custom_sleep(100000);  // Simulate thinking time (100 ms)
+    }
+}
+
+// Writer function
+void writer(int id)
+{
+    int i;
+    for (i = 0; i < NUM_ITERATIONS; i++) {
+        // Request for writing access (exclusive access to data)
+        omp_set_lock(&data_lock);  // Lock the data for writing
+
+        // Write the data (Critical section)
+        data = rand() % 100;  // Update the shared data
+        printf("Writer %d is writing data: %d\n", id, data);
+        custom_sleep(100000);  // Simulate writing time (100 ms)
+
+        omp_unset_lock(&data_lock);  // Release the data lock
+
+        custom_sleep(100000);  // Simulate thinking time (100 ms)
+    }
+}
+
+int main()
+{
+    int i;
+
+    // Initialize locks
+    omp_init_lock(&data_lock);
+    omp_init_lock(&reader_lock);
+
+    // Create reader and writer threads
+    #pragma omp parallel num_threads(NUM_READERS + NUM_WRITERS)
+    {
+        int id = omp_get_thread_num();
+        
+        if (id < NUM_READERS) {
+            reader(id);
+        } else {
+            writer(id - NUM_READERS);  // Offset writer ID to start from 0
+        }
+    }
+
+    // Destroy locks
+    omp_destroy_lock(&data_lock);
+    omp_destroy_lock(&reader_lock);
+
+    return 0;
+}
+
+
+4) Printer spooler problem 
+
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>    // Include for nanosleep
+
+#define NUM_PRINTERS 1  // Number of printers available
+#define NUM_JOBS 5      // Number of print jobs
+
+// Shared variable to simulate the printer
+int printer_busy = 0;  // 0 means the printer is available, 1 means it's busy
+
+// Lock for synchronizing access to the printer
+omp_lock_t printer_lock;
+
+// Job function (simulating print jobs)
+void print_job(int job_id)
+{
+    // Simulate job printing time (randomized)
+    printf("Job %d is requesting the printer.\n", job_id);
+
+    // Request for the printer (exclusive access)
+    omp_set_lock(&printer_lock);
+
+    // Printer is now in use, and we print the job
+    printf("Job %d is now printing...\n", job_id);
+
+    // Sleep for a random duration between 0 and 1 second
+    struct timespec req = {0};
+    req.tv_sec = 0;
+    req.tv_nsec = rand() % 1000000000;  // Random sleep time between 0 and 1 second
+    nanosleep(&req, NULL);  // Simulate printing time
+
+    // Release the printer after the job is done
+    printf("Job %d has finished printing.\n", job_id);
+    omp_unset_lock(&printer_lock);
+
+    // Simulate time between print jobs
+    req.tv_nsec = rand() % 1000000000;  // Random time between print jobs
+    nanosleep(&req, NULL);  // Simulate thinking time
+}
+
+int main()
+{
+    int i;
+
+    // Initialize the printer lock
+    omp_init_lock(&printer_lock);
+
+    // Create parallel threads for print jobs
+    #pragma omp parallel num_threads(NUM_JOBS)
+    {
+        int job_id = omp_get_thread_num();
+        print_job(job_id);
+    }
+
+    // Destroy the printer lock
+    omp_destroy_lock(&printer_lock);
+
+    return 0;
+}
+
+5) Sleeping barber
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <omp.h>
+
+#define NUM_CUSTOMERS 10  // Number of customers
+#define NUM_SEATS 3       // Number of waiting room seats
+
+int waiting_customers = 0; // Track number of customers in the waiting room
+
+void barber_sequential() {
+    while (waiting_customers > 0) {
+        printf("Barber: Inviting a customer to the chair. Waiting customers left: %d\n", --waiting_customers);
+        printf("Barber: Cutting hair...\n");
+        sleep(3); // Simulate haircut
+        printf("Barber: Finished haircut. Customer leaves.\n");
+    }
+}
+
+void customer_sequential(int id) {
+    if (waiting_customers < NUM_SEATS) {
+        waiting_customers++;
+        printf("Customer %d: Waiting in the room. Total waiting: %d\n", id, waiting_customers);
+    } else {
+        printf("Customer %d: No available seats, leaving.\n", id);
+    }
+}
+
+int main() {
+    double start, end;
+    
+    // Sequential Version Execution Time
+    start = omp_get_wtime();
+
+    // Sequential version
+    for (int i = 0; i < NUM_CUSTOMERS; i++) {
+        customer_sequential(i + 1);
+    }
+    barber_sequential();
+
+    end = omp_get_wtime();
+    printf("Sequential version execution time: %f seconds\n", end - start);
+
+    // Parallel Version Execution Time
+    waiting_customers = 0; // Reset for parallel version
+    start = omp_get_wtime();
+
+    #pragma omp parallel sections
+    {
+        #pragma omp section
+        {
+            // Barber thread (sequential in this case)
+            barber_sequential();
+        }
+
+        #pragma omp section
+        {
+            // Customer threads
+            #pragma omp parallel for
+            for (int i = 0; i < NUM_CUSTOMERS; i++) {
+                #pragma omp critical
+                {
+                    if (waiting_customers < NUM_SEATS) {
+                        waiting_customers++;
+                        printf("Customer %d: Waiting in the room. Total waiting: %d\n", i + 1, waiting_customers);
+                    } else {
+                        printf("Customer %d: No available seats, leaving.\n", i + 1);
+                    }
+                }
+            }
+        }
+    }
+
+    end = omp_get_wtime();
+    printf("Parallel version execution time: %f seconds\n", end - start);
+
+    return 0;
+}
+
+
+6)  Running group
+
+#include <iostream>
+#include <stdlib.h>
+#include <windows.h>
+#include <omp.h>
+#include <cstdlib>
+#include <ctime>
+#include <vector>
+#include <set>
+
+#define DEBUG 1
+
+using namespace std;
+
+void sleep(int id) {
+    srand(time(0) * id);
+    int duration = rand();
+    Sleep(duration);
+    #ifdef DEBUG
+        cout<<id<<" has arrived after "<<duration<< " milliseconds. ";
+    #endif
+}
+
+int main() {
+    int n, days;
+    cout<<"Enter the total number of days to simulate: ";
+    cin>>days;
+    cout<<"Enter the number of runners in the group: ";
+    cin>>n;
+    cout<<"\n";
+
+    omp_set_num_threads(n);
+
+    vector<int> loneLeader(n);
+    fill(loneLeader.begin(), loneLeader.end(), 0);
+    vector<int> lateCount(n);
+    fill(lateCount.begin(), lateCount.end(), 0);
+    set<int> leftGroup;
+
+    for(int iter = 0; iter < days; iter++) {
+        cout<<"\n\n=========================================\n";
+        cout<<"DAY "<<iter + 1<<"\n\n";
+        int leader = -1;
+        bool started = false;
+        vector<int> runners;
+
+        #pragma omp parallel shared(leader, started, runners, lateCount, loneLeader, leftGroup)
+        {
+            int id = omp_get_thread_num();
+
+            // Check if runner has left the running group
+            if(lateCount[id] >= 5 || loneLeader[id] >= 10) {
+                #ifdef DEBUG
+                    cout<<id<<" has left the running group\n";
+                #endif
+                leftGroup.insert(id);
+            }
+            else {
+                if(leader == -1) {
+                    leader = id;
+                    cout<<"The leader for this session is: "<<leader<<"\n";
+                    runners.push_back(leader);
+                    #ifdef DEBUG
+                        cout<<"The leader has arrived and is waiting...\n\n";
+                    #endif
+                    Sleep(5000);
+                    started = true;
+                    #ifdef DEBUG
+                        cout<<"\nThe leader has started running\n";
+                    #endif
+                }
+                else {
+                    sleep(id);
+                    if(started) {
+                        #ifdef DEBUG
+                            cout<<id<<" is late and has missed the run today.\n";
+                        #endif
+                        lateCount[id]++;
+                    } else {
+                        #ifdef DEBUG
+                            cout<<id<<" has arrived in time.\n";
+                        #endif
+                        runners.push_back(id);
+                    }
+                }
+            }
+            #pragma omp barrier
+        }
+
+        cout<<"\n";
+        for(int i = 0; i < runners.size(); i++) {
+            #ifdef DEBUG
+                cout<<runners[i]<<" was in the running group today\n";
+            #endif
+        }
+        cout<<"\nTotal number of runners today: "<<runners.size()<<"\n";
+        if(runners.size() == 1) {
+            loneLeader[runners[0]]++;
+        }
+        cout<<"=========================================\n";
+
+        if((n - leftGroup.size()) < 2) {
+            cout<<"Not enough runners in the group. The running group is over :(\n";
+            break;
+        }
+    }
+
+    for(int i = 0; i < n; i++) {
+        cout<<i<<" missed the run "<<lateCount[i]<<" times\n";
+        cout<<i<<" ran alone "<<loneLeader[i]<<" times\n";
+    }
+}
